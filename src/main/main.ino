@@ -41,8 +41,8 @@ int accompanimentServoMapping[accompanimentStrings][accompanimentFrets] = {}; //
 
 // stepper control
 const byte maxSteppers = 6;
-const int stepperMaxSpeed = 5000;
-const int stepperSpeed = 5000;
+const int stepperMaxSpeed = 500;
+const int stepperSpeed = 500;
 const int stepperAcceleration = 4000;
 const byte stepperLightThreshold = 250;
 const byte lightSensorPins[maxSteppers] = {A0, A1, A2, A3, A4, A5};
@@ -74,6 +74,7 @@ void setup() {
 
   // stepper init and positioning
   setupLightSensors();
+  setupSteppers();
   setStepperStartPosition(0);  // TODO: add this for all stepper motors
   
   // servo init
@@ -85,6 +86,8 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   // TODO wait for serial cmd to play melody and accompaniment
+  Serial.println(getStepperLightVal(0));
+  delay(100);
 }
 
 /**
@@ -130,8 +133,8 @@ void setupLightSensors(){
  * Afterwars stepper is stopped an position set to 0.
  */
 void setStepperStartPosition(byte i){
-  steppers[i].setSpeed(1000);
-  while(analogRead(lightSensorPins[i]) > stepperLightThreshold) { // TODO test this
+  steppers[i].setSpeed(stepperSpeed);
+  while(analogRead(lightSensorPins[i]) < stepperLightThreshold) { // TODO test this
     steppers[i].runSpeed();
   }
   steppers[i].stop();
