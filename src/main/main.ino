@@ -27,6 +27,12 @@ MiniMaestro maestro_1(maestroSerial_1);
 MiniMaestro maestro_2(maestroSerial_2);
 
 
+boolean DEBUG = true;
+boolean WARNINGS = true;
+
+// Music
+const int bpm = 180;
+
 const byte melodyStrings = 3;
 const byte melodyFrets = 10;
 const byte accompanimentStrings = 3;
@@ -44,6 +50,7 @@ const byte maxSteppers = 6;
 const int stepperMaxSpeed = 500;
 const int stepperSpeed = 500;
 const int stepperAcceleration = 4000;
+const byte stepsPerPluck = 40; // n = # pleks (5), s = number of steps per revolution (200) s/n = number of steps: 200/5 = 40
 const byte stepperLightThreshold = 250;
 const byte lightSensorPins[maxSteppers] = {A0, A1, A2, A3, A4, A5};
 
@@ -87,7 +94,8 @@ void loop() {
   // put your main code here, to run repeatedly:
   // TODO wait for serial cmd to play melody and accompaniment
   Serial.println(getStepperLightVal(0));
-  delay(100);
+  pluck(0);
+  delay(60000/bpm);
 }
 
 /**
@@ -105,10 +113,21 @@ void fretAccompaniment(byte s, byte f){
 }
 
 /**
- * TODO: write comment
+ * Sets new move to position for stepper s, runs to the according position,
+ * checks if stepper is at right position and prints warning otherwise.
+ * Resets position of stepper s to 0.
  */
 void pluck(byte s){
-  // TODO implement this
+  steppers[s].moveTo(stepsPerPluck);
+  steppers[s].runToPosition();
+  if(getStepperLightVal(s) < stepperLightThreshold) {
+    if(WARNINGS){
+      Serial.print("Recalibration might be needed for string: ");
+      Serial.println(s);
+    }
+  }
+  steppers[s].setCurrentPosition(0);
+  
 }
 
 /**
@@ -133,9 +152,20 @@ void setupLightSensors(){
  * Afterwars stepper is stopped an position set to 0.
  */
 void setStepperStartPosition(byte i){
+  if (DEBUG) {
+    Serial.print("Stepper: ");
+    Serial.print(i);
+    Serial.println(" seeks start Position.");
+  }
   steppers[i].setSpeed(stepperSpeed);
   while(analogRead(lightSensorPins[i]) < stepperLightThreshold) { // TODO test this
     steppers[i].runSpeed();
+    if (DEBUG) {
+    Serial.print("Lightval for stepper: ");
+    Serial.print(i);
+    Serial.print(" is: ");
+    Serial.println(getStepperLightVal(i));
+    }
   }
   steppers[i].stop();
   steppers[i].setCurrentPosition(0);
