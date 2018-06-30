@@ -26,9 +26,10 @@
 MiniMaestro maestro_1(maestroSerial_1);
 MiniMaestro maestro_2(maestroSerial_2);
 
-
+// show DEBUG, WARNING or ERROR messages
 boolean DEBUG = true;
 boolean WARNINGS = true;
+boolean ERRORS = true;
 
 // Music
 const int bpm = 180;
@@ -38,8 +39,24 @@ const byte melodyFrets = 10;
 const byte accompanimentStrings = 3;
 const byte accompanimentFrets = 13;
 
+// melody servos
+const byte melodyServoSpeed = 0; // speed limit in units of (1/4 microseconds)/(10 milliseconds), 0 = unlimitied
+const byte melodyServoAcceleration = 0; // 0 ... infinity (max) to 255; 
 // melodyServoMapping contains the servo id for a fret on a string
-int melodyServoMapping[melodyStrings][melodyFrets] = {};  // TODO: think about pin mapping for all servos
+const int melodyServoMapping[melodyStrings][melodyFrets] = {
+  {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+  {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+  {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1}};  // TODO: think about pin mapping for all servos
+  
+const int melodyFretDownVal[melodyStrings][melodyFrets] = {
+  {6500, 6500, 6500, 6500, 6500, 6500, 6500, 6500, 6500, 6500},
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+  
+const int melodyFretUpVal[melodyStrings][melodyFrets] = {
+  {7000, 7000, 7000, 7000, 7000, 7000, 7000, 7000, 7000, 7000},
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
 // accompanimentServoMapping contains the servo positions in
 // microseconds per fret
@@ -47,11 +64,11 @@ int accompanimentServoMapping[accompanimentStrings][accompanimentFrets] = {}; //
 
 // stepper control
 const byte maxSteppers = 6;
-const int stepperMaxSpeed = 500;
-const int stepperSpeed = 500;
+const int stepperMaxSpeed = 1000;
+const int stepperSpeed = 1000;
 const int stepperAcceleration = 4000;
 const byte stepsPerPluck = 40; // n = # pleks (5), s = number of steps per revolution (200) s/n = number of steps: 200/5 = 40
-const byte stepperLightThreshold = 250;
+const byte stepperLightThreshold = 100;
 const byte lightSensorPins[maxSteppers] = {A0, A1, A2, A3, A4, A5};
 
 // stepPin, dirPin per stepper motor
@@ -67,7 +84,7 @@ const byte stepperPinMapping[maxSteppers][2] = {{30, 31}, {32, 33}, {34, 35}, {3
 //AccelStepper stepper5(AccelStepper::DRIVER, stepperPinMapping[5][0], stepperPinMapping[5][1]);
 
 AccelStepper steppers[maxSteppers] = { // TODO: test this
-  AccelStepper(AccelStepper::DRIVER, stepperPinMapping[0][0], stepperPinMapping[0][1]), // TODO: switch wires
+  AccelStepper(AccelStepper::DRIVER, stepperPinMapping[0][0], stepperPinMapping[0][1]),
   AccelStepper(AccelStepper::DRIVER, stepperPinMapping[1][0], stepperPinMapping[1][1]),
   AccelStepper(AccelStepper::DRIVER, stepperPinMapping[2][0], stepperPinMapping[2][1]),
   AccelStepper(AccelStepper::DRIVER, stepperPinMapping[3][0], stepperPinMapping[3][1]),
@@ -85,30 +102,65 @@ void setup() {
   setStepperStartPosition(0);  // TODO: add this for all stepper motors
   
   // servo init
-
+  setupFrettingServos();
+  
   Serial.begin(9600);
-  Serial.println("Setup done.");
+  if(DEBUG) {
+    Serial.println("Setup done.");
+    Serial.print("bpm: ");
+    Serial.print(bpm);
+    Serial.println();
+  }
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   // TODO wait for serial cmd to play melody and accompaniment
-  Serial.println(getStepperLightVal(0));
-  pluck(0);
-  delay(60000/bpm);
+  // Serial.println(getStepperLightVal(0));
+  int s = 0;  // stirng
+  int f = 9;  // fret
+  for(int s = 0; s < 1; s++) {
+    for(int f = 0; f < melodyFrets; f++){
+      fretMelody(s, f);
+      pluck_2(0);
+      delay(60000/bpm);
+      releaseFretMelody(s, f);
+      delay(100);  
+    }
+  }
 }
 
 /**
  * TODO: write comment
  */
-void fretMelody(byte s, byte f){
+void fretMelody(byte s, byte f) {
   // TODO implement this
+  if(s < 2) { // use maestroSerial_1 for strings 0 and 1
+    maestro_1.setTarget(melodyServoMapping[s][f], melodyFretDownVal[s][f]);
+  } else {
+    if(ERRORS){
+      Serial.println("Not implemented yet");
+    }
+  }
 }
 
 /**
  * TODO: write comment
  */
-void fretAccompaniment(byte s, byte f){
+void releaseFretMelody(byte s, byte f) {
+  if(s < 2) { // use maestroSerial_1 for strings 0 and 1
+    maestro_1.setTarget(melodyServoMapping[s][f], melodyFretUpVal[s][f]);
+  } else {
+    if(ERRORS){
+      Serial.println("Not implemented yet");
+    }
+  }
+}
+
+/**
+ * TODO: write comment
+ */
+void fretAccompaniment(byte s, byte f) {
   // TODO implement this
 }
 
@@ -117,17 +169,28 @@ void fretAccompaniment(byte s, byte f){
  * checks if stepper is at right position and prints warning otherwise.
  * Resets position of stepper s to 0.
  */
-void pluck(byte s){
+void pluck(byte s) {
   steppers[s].moveTo(stepsPerPluck);
   steppers[s].runToPosition();
   if(getStepperLightVal(s) < stepperLightThreshold) {
+    setStepperStartPosition(s);
     if(WARNINGS){
       Serial.print("Recalibration might be needed for string: ");
       Serial.println(s);
     }
   }
   steppers[s].setCurrentPosition(0);
-  
+}
+
+void pluck_2(byte s){
+  steppers[s].setSpeed(stepperSpeed);
+  long t1 = millis();
+  while(analogRead(lightSensorPins[s]) < stepperLightThreshold || (millis() - t1) < 20) { // TODO test this
+    steppers[s].runSpeed();
+  }
+  steppers[s].stop();
+  steppers[s].setCurrentPosition(0);
+  steppers[s].setSpeed(stepperSpeed);
 }
 
 /**
@@ -140,8 +203,8 @@ void damp(byte s){
 /**
  * TODO: write comment
  */
-void setupLightSensors(){
-  for(byte i = 0; i < maxSteppers; i++){
+void setupLightSensors() {
+  for(byte i = 0; i < maxSteppers; i++) {
     pinMode(lightSensorPins[i], INPUT);
   }
 }
@@ -151,7 +214,7 @@ void setupLightSensors(){
  * as the according light sensor returns a value below the threshold.
  * Afterwars stepper is stopped an position set to 0.
  */
-void setStepperStartPosition(byte i){
+void setStepperStartPosition(byte i) {
   if (DEBUG) {
     Serial.print("Stepper: ");
     Serial.print(i);
@@ -176,8 +239,8 @@ void setStepperStartPosition(byte i){
  * Sets maximum speed, current speed and acceleration values
  * for all stepper motors
  */
-void setupSteppers(){
-  for(byte i = 0; i < maxSteppers; i++){
+void setupSteppers() {
+  for(byte i = 0; i < maxSteppers; i++) {
     steppers[i].setMaxSpeed(stepperMaxSpeed);
     steppers[i].setAcceleration(stepperAcceleration);
     steppers[i].setSpeed(stepperSpeed);
@@ -187,14 +250,29 @@ void setupSteppers(){
 /**
  * returns current value of the light sensor i
  */
-int getStepperLightVal(byte i){
+int getStepperLightVal(byte i) {
   return analogRead(lightSensorPins[i]);
 }
 
 /**
  * TODO: write comment
  */
-void setupTiming(int timing){
+void setupTiming(int timing) {
   // TODO implement this
+}
+
+void setupFrettingServos() {
+  for(int s = 0; s < melodyStrings; s++) {
+    for(int f = 0; f < melodyFrets; f++) {
+      if(s < 2) { // use maestroSerial_1 for strings 0 and 1
+        maestro_1.setSpeed(melodyServoMapping[s][f], melodyServoSpeed);
+        maestro_1.setAcceleration(melodyServoMapping[s][f], melodyServoAcceleration);
+      } else {
+        if(ERRORS) {
+          Serial.println("Not implemented yet");
+        }
+      }
+    }
+  }
 }
 
