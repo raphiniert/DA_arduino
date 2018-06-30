@@ -62,6 +62,14 @@ const int melodyFretUpVal[melodyStrings][melodyFrets] = {
 // microseconds per fret
 int accompanimentServoMapping[accompanimentStrings][accompanimentFrets] = {}; // TODO: find out positions
 
+// damping servos
+const byte maxDampingServos = 6;
+const byte dampingServoSpeed = 0; // speed limit in units of (1/4 microseconds)/(10 milliseconds), 0 = unlimitied
+const byte dampingServoAcceleration = 128; // 0 ... infinity (max) to 255; 
+
+const int dampingServoMapping[maxDampingServos] = {10, -1, -1, -1, -1, -1};
+const int dampingServoValues[maxDampingServos][2] = {{7100, 6900}, {6000, 6000}, {6000, 6000}, {6000, 6000}, {6000, 6000}, {6000, 6000}};  //{{damp, free}}
+
 // stepper control
 const byte maxSteppers = 6;
 const int stepperMaxSpeed = 1000;
@@ -103,6 +111,7 @@ void setup() {
   
   // servo init
   setupFrettingServos();
+  setupDampingServos();
   
   Serial.begin(9600);
   if(DEBUG) {
@@ -125,9 +134,11 @@ void loop() {
       delay(80);
       pluck_2(0);
       delay(60000/bpm);
-      //delay(5000);
+      damp(s);
+      delay(80);
       releaseFretMelody(s, f);
-      //delay(50);  
+      releaseDamping(s);
+      
     }
   }
 }
@@ -184,22 +195,45 @@ void pluck(byte s) {
   steppers[s].setCurrentPosition(0);
 }
 
-void pluck_2(byte s){
+/**
+ * Plucks string s by running motor s as long as stepperLightThreshold isn't reached
+ * or x ms didn't pass. This is neccessary, because otherwise motor wouldn't run, because
+ * it should always stop above stepperLightThreshold. Resets current stepper position to 0.
+ */
+void pluck_2(byte s) {
   steppers[s].setSpeed(stepperSpeed);
   long t1 = millis();
-  while(analogRead(lightSensorPins[s]) < stepperLightThreshold || (millis() - t1) < 20) { // TODO test this
+  while(analogRead(lightSensorPins[s]) < stepperLightThreshold || (millis() - t1) < 20) {
     steppers[s].runSpeed();
   }
   steppers[s].stop();
   steppers[s].setCurrentPosition(0);
-  steppers[s].setSpeed(stepperSpeed);
 }
 
 /**
  * TODO: write comment
  */
-void damp(byte s){
-  // TODO implement this
+void damp(byte s) {
+  if(s < 2) { // use maestroSerial_1 for strings 0 and 1
+    maestro_1.setTarget(dampingServoMapping[s], dampingServoValues[s][0]);
+  } else {
+    if(ERRORS){
+      Serial.println("Not implemented yet");
+    }
+  }
+}
+
+/**
+ * TODO: write comment
+ */
+void releaseDamping(byte s) {
+  if(s < 2) { // use maestroSerial_1 for strings 0 and 1
+    maestro_1.setTarget(dampingServoMapping[s], dampingServoValues[s][1]);
+  } else {
+    if(ERRORS){
+      Serial.println("Not implemented yet");
+    }
+  }
 }
 
 /**
@@ -274,6 +308,20 @@ void setupFrettingServos() {
         if(ERRORS) {
           Serial.println("Not implemented yet");
         }
+      }
+    }
+  }
+}
+
+void setupDampingServos() {
+  for(int s = 0; s < maxDampingServos; s++) {
+    if(s < 2) { // use maestroSerial_1 for strings 0 and 1
+      maestro_1.setSpeed(dampingServoMapping[s], dampingServoSpeed);
+      maestro_1.setAcceleration(dampingServoMapping[s], dampingServoAcceleration);
+      releaseDamping(s);
+    } else {
+      if(ERRORS) {
+        Serial.println("Not implemented yet");
       }
     }
   }
