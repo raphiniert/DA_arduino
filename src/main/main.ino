@@ -49,12 +49,12 @@ const int melodyServoMapping[melodyStrings][melodyFrets] = {
   {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1}};  // TODO: think about pin mapping for all servos
   
 const int melodyFretDownVal[melodyStrings][melodyFrets] = {
-  {6500, 6500, 6500, 6500, 6500, 6500, 6500, 6500, 6500, 6500},
+  {6000, 7400, 5800, 7600, 6100, 7500, 5800, 7600, 6400, 6000},
   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
   
 const int melodyFretUpVal[melodyStrings][melodyFrets] = {
-  {7000, 7000, 7000, 7000, 7000, 7000, 7000, 7000, 7000, 7000},
+  {6550, 6900, 6500, 7000, 6700, 6900, 6500, 7200, 5800, 6600},
   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
@@ -118,14 +118,16 @@ void loop() {
   // TODO wait for serial cmd to play melody and accompaniment
   // Serial.println(getStepperLightVal(0));
   int s = 0;  // stirng
-  int f = 9;  // fret
+  int f = 0;  // fret
   for(int s = 0; s < 1; s++) {
     for(int f = 0; f < melodyFrets; f++){
       fretMelody(s, f);
+      delay(80);
       pluck_2(0);
       delay(60000/bpm);
+      //delay(5000);
       releaseFretMelody(s, f);
-      delay(100);  
+      //delay(50);  
     }
   }
 }
@@ -267,6 +269,7 @@ void setupFrettingServos() {
       if(s < 2) { // use maestroSerial_1 for strings 0 and 1
         maestro_1.setSpeed(melodyServoMapping[s][f], melodyServoSpeed);
         maestro_1.setAcceleration(melodyServoMapping[s][f], melodyServoAcceleration);
+        releaseFretMelody(s, f);
       } else {
         if(ERRORS) {
           Serial.println("Not implemented yet");
