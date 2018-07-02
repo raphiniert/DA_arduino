@@ -1,7 +1,7 @@
 /* https://github.com/raphiniert/DA_arduino
  * 2018.06.22
  * main.ino
- * Authors: Jakob Baltter, Raphael Kamper
+ * Authors: Jakob Blattner, Raphael Kamper
  * This is the arduino code running on an Arduino Mega Rev 3
  * board to control a guitar robot. Including multiple servo
  * motors controlled via 2 Pololu Maestro Mini 18 servo
@@ -32,7 +32,13 @@ boolean WARNINGS = true;
 boolean ERRORS = true;
 
 // Music
-const int bpm = 180;
+int bpm = 160;
+
+// Timing
+const int noteDuration = 60000/bpm;
+const int servoMoveDownTime = 80;  // milliseconds
+const int servoDampingTime = 80;  // milliseconds
+long t1 = 0;
 
 const byte melodyStrings = 3;
 const byte melodyFrets = 10;
@@ -82,15 +88,6 @@ const byte lightSensorPins[maxSteppers] = {A0, A1, A2, A3, A4, A5};
 // stepPin, dirPin per stepper motor
 const byte stepperPinMapping[maxSteppers][2] = {{30, 31}, {32, 33}, {34, 35}, {36, 37}, {38, 39}, {40, 41}};
 
-// melody steppers
-//AccelStepper stepper0(AccelStepper::DRIVER, stepperPinMapping[0][0], stepperPinMapping[0][1]); // TODO switch on arduino
-//AccelStepper stepper1(AccelStepper::DRIVER, stepperPinMapping[1][0], stepperPinMapping[1][1]);
-//AccelStepper stepper2(AccelStepper::DRIVER, stepperPinMapping[2][0], stepperPinMapping[2][1]);
-// accompaniment steppers
-//AccelStepper stepper3(AccelStepper::DRIVER, stepperPinMapping[3][0], stepperPinMapping[3][1]);
-//AccelStepper stepper4(AccelStepper::DRIVER, stepperPinMapping[4][0], stepperPinMapping[4][1]);
-//AccelStepper stepper5(AccelStepper::DRIVER, stepperPinMapping[5][0], stepperPinMapping[5][1]);
-
 AccelStepper steppers[maxSteppers] = { // TODO: test this
   AccelStepper(AccelStepper::DRIVER, stepperPinMapping[0][0], stepperPinMapping[0][1]),
   AccelStepper(AccelStepper::DRIVER, stepperPinMapping[1][0], stepperPinMapping[1][1]),
@@ -130,15 +127,23 @@ void loop() {
   int f = 0;  // fret
   for(int s = 0; s < 1; s++) {
     for(int f = 0; f < melodyFrets; f++){
+      t1 = millis();
       fretMelody(s, f);
-      delay(80);
+      while(millis() - t1 < servoMoveDownTime){
+        ;
+      }
+      t1 = millis();
       pluck_2(0);
-      delay(60000/bpm);
+      while(millis() - t1 < noteDuration - servoMoveDownTime - servoDampingTime){
+        ;
+      }
+      t1 = millis();
       damp(s);
-      delay(80);
+      while(millis() - t1 < servoDampingTime){
+        ;
+      }
       releaseFretMelody(s, f);
       releaseDamping(s);
-      
     }
   }
 }
@@ -293,8 +298,9 @@ int getStepperLightVal(byte i) {
 /**
  * TODO: write comment
  */
-void setupTiming(int timing) {
+void setTiming(int newBpm) {
   // TODO implement this
+  bpm = newBpm;
 }
 
 void setupFrettingServos() {
