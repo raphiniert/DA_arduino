@@ -27,12 +27,12 @@ MiniMaestro maestro_1(Serial1);
 MiniMaestro maestro_2(Serial2);
 
 // show DEBUG, WARNING or ERROR messages
-boolean DEBUG = true;
+boolean DEBUG = false;
 boolean WARNINGS = true;
 boolean ERRORS = true;
 
 // Music
-int bpm = 180;
+int bpm = 100;
 
 // Timing
 const long noteDuration = 60000 / bpm;
@@ -123,6 +123,13 @@ const byte song[song_notes][3] = {  //string, fret, duration
   {2, 3, 4}
 };
 
+//Serial communication
+String receivedMsg = "";
+int serialReceivedString = 0;
+int serialReceivedFret = 0;
+int serialReceivedDuration = 0;
+int serialReceivedDamping = 0;
+
 void setup() {
   // put your setup code here, to run once:
   Serial1.begin(9600); //maestroSerial_1.begin(9600);
@@ -152,7 +159,7 @@ void loop() {
   // put your main code here, to run repeatedly:
   // TODO wait for serial cmd to play melody and accompaniment
   // Serial.println(getStepperLightVal(0));
-  int s = 0;  // stirng
+  /*int s = 0;  // stirng
   int f = 0;  // fret
   for (int s = 1; s < 3; s++) {
     for (int f = 0; f < melodyFrets; f++) {
@@ -166,7 +173,7 @@ void loop() {
       }
       t1 = millis();
       pluck_2(s);
-      while (millis() - t1 < noteDuration /** song[n][2]*/ - servoMoveDownTime - servoDampingTime) {
+      while (millis() - t1 < noteDuration /** song[n][2]*//* - servoMoveDownTime - servoDampingTime) {
         ;
       }
       t1 = millis();
@@ -177,14 +184,66 @@ void loop() {
       releaseFretMelody(s, f);
       releaseDamping(s);
     }
+  }*/
+
+  if (Serial.available() > 0){
+    // waiting to receive something.
+    receivedMsg = Serial.readStringUntil('\n');
+    int msgIndStart = 0;
+    int msgIndEnd = 0;
+    msgIndStart = receivedMsg.indexOf(",") + 1;
+    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
+    serialReceivedString = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
+
+    msgIndStart = msgIndEnd + 1;
+    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
+    serialReceivedFret = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
+
+    msgIndStart = msgIndEnd + 1;
+    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
+    serialReceivedDuration = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
+    
+    msgIndStart = msgIndEnd + 1;
+    serialReceivedDamping = receivedMsg.substring(msgIndStart, msgIndStart + 1).toInt();
+    
+    while(Serial.availableForWrite() <= 0){
+      ; // wait
+    }
+    if(Serial.availableForWrite() > 0){
+      Serial.println(receivedMsg);
+    }
+
+    t1 = millis();
+    fretMelody(serialReceivedString, serialReceivedFret);
+    while (millis() - t1 < servoMoveDownTime) {
+      ;
+    }
+    t1 = millis();
+    pluck_2(serialReceivedString);
+    while (millis() - t1 < noteDuration * serialReceivedDuration - servoMoveDownTime - servoDampingTime) {
+      ;
+    }
+    t1 = millis();
+    damp(serialReceivedString);
+    while (millis() - t1 < servoDampingTime) {
+      ;
+    }
+    releaseFretMelody(serialReceivedString, serialReceivedFret);
+    releaseDamping(serialReceivedString);
   }
+  
 }
 
 /**
    TODO: write comment
 */
 void fretMelody(byte s, byte f) {
-  Serial.println("WTF");
+  Serial.print("WTF === ");
+  Serial.print("s: ");
+  Serial.print(s);
+  Serial.print(" f: ");
+  Serial.print(f);
+  Serial.println(" === WTF");
   if (s < 1) { // use maestroSerial_1 for strings 0 and 1
     maestro_1.setTarget(melodyServoMapping[s][f], melodyFretDownVal[s][f]);
     Serial.println("s < 1");
@@ -381,6 +440,7 @@ void setupFrettingServos() {
           Serial.println("Not implemented yet! In setupFrettingServos()");
         }
       }
+      delay(1000);
     }
   }
 }
