@@ -35,7 +35,7 @@ boolean ERRORS = true;
 int bpm = 100;
 
 // Timing
-const long noteDuration = 60000 / bpm;
+long noteDuration = 60000 / bpm;
 const int servoMoveDownTime = 80;  // milliseconds
 const int servoDampingTime = 80;  // milliseconds
 long t1 = 0;
@@ -129,6 +129,7 @@ int serialReceivedString = 0;
 int serialReceivedFret = 0;
 int serialReceivedDuration = 0;
 int serialReceivedDamping = 0;
+int serialReceivedBpm = 100;
 
 void setup() {
   // put your setup code here, to run once:
@@ -193,6 +194,10 @@ void loop() {
     int msgIndEnd = 0;
     msgIndStart = receivedMsg.indexOf(",") + 1;
     msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
+    serialReceivedBpm = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
+
+    msgIndStart = msgIndEnd + 1;
+    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
     serialReceivedString = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
 
     msgIndStart = msgIndEnd + 1;
@@ -205,6 +210,8 @@ void loop() {
     
     msgIndStart = msgIndEnd + 1;
     serialReceivedDamping = receivedMsg.substring(msgIndStart, msgIndStart + 1).toInt();
+
+    noteDuration = 60000 / serialReceivedBpm;
     
     while(Serial.availableForWrite() <= 0){
       ; // wait
@@ -238,15 +245,8 @@ void loop() {
    TODO: write comment
 */
 void fretMelody(byte s, byte f) {
-  Serial.print("WTF === ");
-  Serial.print("s: ");
-  Serial.print(s);
-  Serial.print(" f: ");
-  Serial.print(f);
-  Serial.println(" === WTF");
   if (s < 1) { // use maestroSerial_1 for strings 0 and 1
     maestro_1.setTarget(melodyServoMapping[s][f], melodyFretDownVal[s][f]);
-    Serial.println("s < 1");
   } else if (s == 1 &&  f < 7){
     maestro_1.setTarget(melodyServoMapping[s][f], melodyFretDownVal[s][f]);
   } else if (s == 1 &&  f >= 7){
@@ -272,13 +272,10 @@ void releaseFretMelody(byte s, byte f) {
   }
   if (s < 1) { // use maestroSerial_1 for strings 0 and 1
     maestro_1.setTarget(melodyServoMapping[s][f], melodyFretUpVal[s][f]);
-    Serial.println("s < 1");
   } else if (s == 1 &&  f < 7){
     maestro_1.setTarget(melodyServoMapping[s][f], melodyFretUpVal[s][f]);
-    Serial.println("s == 1 && f < 7");
   } else if (s == 1 &&  f >= 7){
     maestro_2.setTarget(melodyServoMapping[s][f], melodyFretUpVal[s][f]);
-    Serial.println("s == 1 && f >= 7");
   } else if(s == 2) {
     maestro_2.setTarget(melodyServoMapping[s][f], melodyFretUpVal[s][f]);
   } else {
@@ -440,7 +437,7 @@ void setupFrettingServos() {
           Serial.println("Not implemented yet! In setupFrettingServos()");
         }
       }
-      delay(1000);
+      delay(100);
     }
   }
 }
