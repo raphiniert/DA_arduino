@@ -130,6 +130,7 @@ int serialReceivedFret = 0;
 int serialReceivedDuration = 0;
 int serialReceivedDamping = 0;
 int serialReceivedBpm = 100;
+int serialReceivedFrets[3] = {-1, -1, -1};
 
 void setup() {
   // put your setup code here, to run once:
@@ -156,7 +157,71 @@ void setup() {
   }
 }
 
-void loop() {
+void loop(){
+  if (Serial.available() > 0){
+    // waiting to receive something.
+    receivedMsg = Serial.readStringUntil('\n');
+    int msgIndStart = 0;
+    int msgIndEnd = 0;
+    msgIndStart = receivedMsg.indexOf(",") + 1;
+    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
+    serialReceivedBpm = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
+
+    msgIndStart = msgIndEnd + 1;
+    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
+    serialReceivedFrets[0] = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
+
+    msgIndStart = msgIndEnd + 1;
+    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
+    serialReceivedFrets[1] = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
+
+    msgIndStart = msgIndEnd + 1;
+    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
+    serialReceivedFrets[2] = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
+
+    msgIndStart = msgIndEnd + 1;
+    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
+    serialReceivedDuration = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
+    
+    msgIndStart = msgIndEnd + 1;
+    serialReceivedDamping = receivedMsg.substring(msgIndStart, msgIndStart + 1).toInt();
+
+    noteDuration = 60000 / serialReceivedBpm;
+
+    boolean strings[3] = {false, false, false};
+    for(int i = 0; i < 3; i++) {
+      strings[i] = serialReceivedFrets[i] >= 0 ? true : false;
+    }
+    
+    while(Serial.availableForWrite() <= 0){
+      ; // wait
+    }
+    if(Serial.availableForWrite() > 0){
+      Serial.println(receivedMsg);
+    }
+
+    t1 = millis();
+    fretSimultan(serialReceivedFrets);
+    while (millis() - t1 < servoMoveDownTime) {
+      ;
+    }
+    t1 = millis();
+    pluckSimultan(strings);
+    while (millis() - t1 < noteDuration * serialReceivedDuration - servoMoveDownTime - servoDampingTime) {
+      ;
+    }
+    t1 = millis();
+    damp(serialReceivedString);
+    while (millis() - t1 < servoDampingTime) {
+      ;
+    }
+    releaseFretSimultan(serialReceivedFrets);
+    releaseDamping(serialReceivedString);
+  }
+}
+
+
+void loop_old() {
   // put your main code here, to run repeatedly:
   // TODO wait for serial cmd to play melody and accompaniment
   // Serial.println(getStepperLightVal(0));
@@ -286,11 +351,35 @@ void releaseFretMelody(byte s, byte f) {
 }
 
 /**
+ * TODO: write comment
+ */
+void releaseFretSimultan(int frets[]) {
+  for(int s = 0; s < sizeof(frets)/sizeof(int); s++){
+    if (frets[s] > 0) {
+      releaseFretMelody(s, frets[s]);
+    }
+  }
+}
+
+/**
    TODO: write comment
 */
 void fretAccompaniment(byte s, byte f) {
   // TODO implement this
 }
+
+/**
+ * TODO: write comment
+ */
+void fretSimultan(int frets[]) {
+  for(int s = 0; s < sizeof(frets)/sizeof(int); s++){
+    if (frets[s] > 0) {
+      fretMelody(s, frets[s]);
+    }
+  }
+}
+
+
 
 /**
    Sets new move to position for stepper s, runs to the according position,
@@ -323,6 +412,59 @@ void pluck_2(byte s) {
   }
   steppers[s].stop();
   steppers[s].setCurrentPosition(0);
+}
+
+
+/**
+ * TODO: write comment
+ */
+boolean stopAllStrings(boolean stopStrings[]) {
+  for(int i = 0; i < sizeof(stopStrings); i++){
+    if(!stopStrings[i]){
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * TODO: assuming there are 3 strings for now, but needs to be generalized
+ */
+void pluckSimultan(boolean strings[]) {
+  steppers[0].setSpeed(stepperSpeed);
+  steppers[1].setSpeed(stepperSpeed);
+  steppers[2].setSpeed(stepperSpeed);
+  long t1 = millis();
+
+  boolean stopStrings[3] = {false, false, false};
+  for(int i = 0; i < 3; i++){
+    stopStrings[i] = !strings[i]; //if string should be played set stop to false
+  }
+  while (!stopAllStrings(stopStrings) || (millis() - t1) < 20) {
+    if(!stopStrings[0] && analogRead(lightSensorPins[0]) < stepperLightThreshold) {
+      steppers[0].runSpeed();
+    } else {
+      steppers[0].stop();
+    }
+    if(!stopStrings[1] && analogRead(lightSensorPins[1]) < stepperLightThreshold) {
+      steppers[1].runSpeed();
+    } else {
+      steppers[1].stop();
+    }
+    if(!stopStrings[2] && analogRead(lightSensorPins[2]) < stepperLightThreshold) {
+      steppers[2].runSpeed();
+    } else {
+      steppers[2].stop();
+    }
+  }
+
+  steppers[0].stop();
+  steppers[1].stop();
+  steppers[2].stop();
+  
+  steppers[0].setCurrentPosition(0);
+  steppers[1].setCurrentPosition(0);
+  steppers[2].setCurrentPosition(0);
 }
 
 /**
