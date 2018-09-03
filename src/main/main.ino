@@ -152,15 +152,24 @@ void setup() {
   if (DEBUG) {
     Serial.println("Setup done.");
     Serial.print("bpm: ");
-    Serial.print(bpm);
-    Serial.println();
+    Serial.println(bpm);
   }
 }
+
+//int msgInd = 0; // only for DEBUGGING
 
 void loop(){
   if (Serial.available() > 0){
     // waiting to receive something.
-    receivedMsg = Serial.readStringUntil('\n');
+    //receivedMsg = Serial.readStringUntil('\n');
+    
+    /* DEBUG
+    if (msgInd % 2 == 0){
+      receivedMsg = "10,100,3,3,3,1,0\n";
+    } else {
+      receivedMsg = "10,100,5,6,7,1,0\n";
+    }
+    msgInd++;*/
     int msgIndStart = 0;
     int msgIndEnd = 0;
     msgIndStart = receivedMsg.indexOf(",") + 1;
@@ -192,6 +201,28 @@ void loop(){
     for(int i = 0; i < 3; i++) {
       strings[i] = serialReceivedFrets[i] >= 0 ? true : false;
     }
+
+    if (DEBUG) {
+      Serial.print("serialReceivedBpm: ");
+      Serial.print(serialReceivedBpm);
+      Serial.print(" serialReceivedFrets[0]: ");
+      Serial.print(serialReceivedFrets[0]);
+      Serial.print(" serialReceivedFrets[1]: ");
+      Serial.print(serialReceivedFrets[1]);
+      Serial.print(" serialReceivedFrets[2]: ");
+      Serial.print(serialReceivedFrets[2]);
+      Serial.print(" serialReceivedDuration: ");
+      Serial.print(serialReceivedDuration);
+      Serial.print(" serialReceivedDamping: ");
+      Serial.println(serialReceivedDamping);
+      Serial.print("strigns[3] = {");
+      Serial.print(strings[0]);
+      Serial.print(", ");
+      Serial.print(strings[1]);
+      Serial.print(", ");
+      Serial.print(strings[2]);
+      Serial.println("}");
+    }
     
     while(Serial.availableForWrite() <= 0){
       ; // wait
@@ -211,12 +242,12 @@ void loop(){
       ;
     }
     t1 = millis();
-    damp(serialReceivedString);
+    //damp(serialReceivedString);
     while (millis() - t1 < servoDampingTime) {
       ;
     }
     releaseFretSimultan(serialReceivedFrets);
-    releaseDamping(serialReceivedString);
+    //releaseDamping(serialReceivedString);
   }
 }
 
@@ -310,6 +341,13 @@ void loop_old() {
    TODO: write comment
 */
 void fretMelody(byte s, byte f) {
+  if (DEBUG) {
+    Serial.print("in fretMelody(");
+    Serial.print(s);
+    Serial.print(", ");
+    Serial.print(f);
+    Serial.println(")");
+  }
   if (s < 1) { // use maestroSerial_1 for strings 0 and 1
     maestro_1.setTarget(melodyServoMapping[s][f], melodyFretDownVal[s][f]);
   } else if (s == 1 &&  f < 7){
@@ -354,7 +392,16 @@ void releaseFretMelody(byte s, byte f) {
  * TODO: write comment
  */
 void releaseFretSimultan(int frets[]) {
-  for(int s = 0; s < sizeof(frets)/sizeof(int); s++){
+  if (DEBUG) {
+      Serial.println("in releaseFretSimultan()");
+  }
+  for(int s = 0; s < 3; s++){
+    if (DEBUG) {
+      Serial.print("frets[");
+      Serial.print(s);
+      Serial.print("] = ");
+      Serial.println(frets[s]);
+    }
     if (frets[s] > 0) {
       releaseFretMelody(s, frets[s]);
     }
@@ -372,7 +419,16 @@ void fretAccompaniment(byte s, byte f) {
  * TODO: write comment
  */
 void fretSimultan(int frets[]) {
-  for(int s = 0; s < sizeof(frets)/sizeof(int); s++){
+  if (DEBUG) {
+      Serial.println("in fretSimultan()");
+  }
+  for(int s = 0; s < 3; s++){
+    if (DEBUG) {
+      Serial.print("frets[");
+      Serial.print(s);
+      Serial.print("] = ");
+      Serial.println(frets[s]);
+    }
     if (frets[s] > 0) {
       fretMelody(s, frets[s]);
     }
@@ -419,7 +475,17 @@ void pluck_2(byte s) {
  * TODO: write comment
  */
 boolean stopAllStrings(boolean stopStrings[]) {
-  for(int i = 0; i < sizeof(stopStrings); i++){
+  if (DEBUG) {
+      Serial.println("in stopAllStrings()");
+      Serial.print("stopStrings[3] = {");
+      Serial.print(stopStrings[0]);
+      Serial.print(", ");
+      Serial.print(stopStrings[1]);
+      Serial.print(", ");
+      Serial.print(stopStrings[2]);
+      Serial.println("};");
+  }
+  for(int i = 0; i < 3; i++){
     if(!stopStrings[i]){
       return false;
     }
@@ -431,30 +497,66 @@ boolean stopAllStrings(boolean stopStrings[]) {
  * TODO: assuming there are 3 strings for now, but needs to be generalized
  */
 void pluckSimultan(boolean strings[]) {
+  if (DEBUG) {
+      Serial.println("in pluckSimultan()");
+  }
   steppers[0].setSpeed(stepperSpeed);
   steppers[1].setSpeed(stepperSpeed);
   steppers[2].setSpeed(stepperSpeed);
-  long t1 = millis();
+  
 
   boolean stopStrings[3] = {false, false, false};
   for(int i = 0; i < 3; i++){
     stopStrings[i] = !strings[i]; //if string should be played set stop to false
   }
-  while (!stopAllStrings(stopStrings) || (millis() - t1) < 20) {
-    if(!stopStrings[0] && analogRead(lightSensorPins[0]) < stepperLightThreshold) {
-      steppers[0].runSpeed();
-    } else {
-      steppers[0].stop();
+  if (DEBUG) {
+      Serial.print("stopStrings[3] = {");
+      Serial.print(stopStrings[0]);
+      Serial.print(", ");
+      Serial.print(stopStrings[1]);
+      Serial.print(", ");
+      Serial.print(stopStrings[2]);
+      Serial.println("};");
+  }
+  long t1 = millis();
+  while (!stopAllStrings(stopStrings)) {
+    /*if (DEBUG) {
+      Serial.println("something must be true...");
+      Serial.print("stopAllStrings() = ");
+      Serial.print(stopAllStrings(stopStrings));
+    }*/
+    if(!stopStrings[0]){
+      if(analogRead(lightSensorPins[0]) < stepperLightThreshold || (millis() - t1) < 20) {
+        steppers[0].runSpeed();
+          if (DEBUG) {
+            Serial.println("String 0 run");
+          }
+      } else {
+        stopStrings[0] = true;
+        steppers[0].stop();
+      }
     }
-    if(!stopStrings[1] && analogRead(lightSensorPins[1]) < stepperLightThreshold) {
-      steppers[1].runSpeed();
-    } else {
-      steppers[1].stop();
+    if(!stopStrings[1]){
+      if(analogRead(lightSensorPins[1]) < stepperLightThreshold || (millis() - t1) < 20) {
+        steppers[1].runSpeed();
+        if (DEBUG) {
+            Serial.println("String 1 run");
+          }
+      } else {
+        stopStrings[1] = true;
+        steppers[1].stop();
+      }
     }
-    if(!stopStrings[2] && analogRead(lightSensorPins[2]) < stepperLightThreshold) {
-      steppers[2].runSpeed();
-    } else {
-      steppers[2].stop();
+    if(!stopStrings[2]){
+      if(analogRead(lightSensorPins[2]) < stepperLightThreshold || (millis() - t1) < 20) {
+        steppers[2].runSpeed();
+        if (DEBUG) {
+            Serial.println("String 2 run");
+          }
+      } else {
+        stopStrings[2] = true;
+        steppers[2].stop();
+      }
     }
   }
 
@@ -579,7 +681,7 @@ void setupFrettingServos() {
           Serial.println("Not implemented yet! In setupFrettingServos()");
         }
       }
-      delay(100);
+      delay(500);
     }
   }
 }
