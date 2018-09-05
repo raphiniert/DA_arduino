@@ -76,8 +76,8 @@ const byte maxDampingServos = 6;
 const byte dampingServoSpeed = 0; // speed limit in units of (1/4 microseconds)/(10 milliseconds), 0 = unlimitied
 const byte dampingServoAcceleration = 128; // 0 ... infinity (max) to 255;
 
-const int dampingServoMapping[maxDampingServos] = {10, -1, -1, -1, -1, -1};
-const int dampingServoValues[maxDampingServos][2] = {{7100, 6900}, {6000, 6000}, {6000, 6000}, {6000, 6000}, {6000, 6000}, {6000, 6000}};  //{{damp, free}}
+const int dampingServoMapping[maxDampingServos] = {10, 13, 14, -1, -1, -1};
+const int dampingServoValues[maxDampingServos][2] = {{7100, 6900}, {7100, 6900}, {7100, 6900}, {6000, 6000}, {6000, 6000}, {6000, 6000}};  //{{damp, free}}
 
 // stepper control
 const byte maxSteppers = 6;
@@ -137,6 +137,8 @@ int serialReceivedDampings[3] = {0, 0, 0};
 boolean activeStrings[3] = {false, false, false};
 int durations[3] = {0, 0, 0};
 int oldFrets[3] = {0, 0, 0};
+int damping[3] = {0, 0, 0};
+int oldDamping[3] = {0, 0, 0};
 
 void setup() {
   // put your setup code here, to run once:
@@ -251,9 +253,9 @@ void loop(){
       Serial.print(activeStrings[2]);
       Serial.println("}");
     }
-
+    
     releaseFretSimultan(oldFrets, durations);
-    //releaseDamping(serialReceivedString);
+    releaseDampingSimultan(serialReceivedDampings);
 
     for(int i = 0; i < 3; i++) {
       if (serialReceivedFrets[i] >= 0) {
@@ -270,16 +272,11 @@ void loop(){
       ;
     }
     t1 = millis();
-    pluckSimultan(activeStrings);
-    /*while (millis() - t1 < noteDuration * serialReceivedDuration - servoMoveDownTime - servoDampingTime) {
-      ;
-    }*/
-    t1 = millis();
-    //damp(serialReceivedString);
+    dampSimultan(serialReceivedDampings);
     while (millis() - t1 < servoDampingTime) {
       ;
     }
-    
+    pluckSimultan(activeStrings);
 
     for(int i = 0; i < 3; i++) {
       durations[i] -= durations[i] > 0 ? 1 : 0;
@@ -359,6 +356,31 @@ void releaseFretSimultan(int frets[], int durations[]) {
     }
     if (frets[s] > 0 && durations[s] == 0) {
       releaseFretMelody(s, frets[s]);
+    }
+  }
+}
+
+void dampSimultan(int dampings[]){
+  if (DEBUG) {
+      Serial.println("in dampSimultan()");
+  }
+  for(int s = 0; s < 3; s++){
+    if(dampings[0]){
+      damp(s);
+    }
+  }
+}
+
+/**
+ * TODO: write comment
+ */
+void releaseDampingSimultan(int dampStrings[]){
+  if (DEBUG) {
+      Serial.println("in releaseDampingSimultan()");
+  }
+  for(int s = 0; s < 3; s++){
+    if(dampStrings[0] == 0){
+      releaseDamping(s);
     }
   }
 }
@@ -486,8 +508,10 @@ void pluckSimultan(boolean strings[]) {
    TODO: write comment
 */
 void damp(byte s) {
-  if (s < 2) { // use maestroSerial_1 for strings 0 and 1
+  if (s < 1) { // use maestroSerial_1 for string 0 
     maestro_1.setTarget(dampingServoMapping[s], dampingServoValues[s][0]);
+  } else if (s < 3) { // use maestroSerial_1 for strings 1 and 2 
+    maestro_2.setTarget(dampingServoMapping[s], dampingServoValues[s][0]);
   } else {
     if (ERRORS) {
       Serial.println("Not implemented yet");
@@ -499,8 +523,10 @@ void damp(byte s) {
    TODO: write comment
 */
 void releaseDamping(byte s) {
-  if (s < 2) { // use maestroSerial_1 for strings 0 and 1
+  if (s < 1) { // use maestroSerial_1 for string 0 
     maestro_1.setTarget(dampingServoMapping[s], dampingServoValues[s][1]);
+  } else if (s < 3) { // use maestroSerial_1 for strings 1 and 2 
+    maestro_2.setTarget(dampingServoMapping[s], dampingServoValues[s][1]);
   } else {
     if (ERRORS) {
       Serial.println("Not implemented yet");
@@ -607,6 +633,10 @@ void setupDampingServos() {
     if (s < 1) { // use maestroSerial_1 for strings 0 and 1
       maestro_1.setSpeed(dampingServoMapping[s], dampingServoSpeed);
       maestro_1.setAcceleration(dampingServoMapping[s], dampingServoAcceleration);
+      releaseDamping(s);
+    } else if(s < 3){
+      maestro_2.setSpeed(dampingServoMapping[s], dampingServoSpeed);
+      maestro_2.setAcceleration(dampingServoMapping[s], dampingServoAcceleration);
       releaseDamping(s);
     } else {
       if (ERRORS) {
