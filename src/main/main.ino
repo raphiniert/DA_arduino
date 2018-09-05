@@ -77,7 +77,7 @@ const byte dampingServoSpeed = 0; // speed limit in units of (1/4 microseconds)/
 const byte dampingServoAcceleration = 128; // 0 ... infinity (max) to 255;
 
 const int dampingServoMapping[maxDampingServos] = {10, 13, 14, -1, -1, -1};
-const int dampingServoValues[maxDampingServos][2] = {{7100, 6900}, {7100, 6900}, {7100, 6900}, {6000, 6000}, {6000, 6000}, {6000, 6000}};  //{{damp, free}}
+const int dampingServoValues[maxDampingServos][2] = {{7000, 6500}, {8000, 7500}, {7000, 6500}, {6000, 6000}, {6000, 6000}, {6000, 6000}};  //{{damp, free}}
 
 // stepper control
 const byte maxSteppers = 6;
@@ -365,7 +365,7 @@ void dampSimultan(int dampings[]){
       Serial.println("in dampSimultan()");
   }
   for(int s = 0; s < 3; s++){
-    if(dampings[0]){
+    if(dampings[s]){
       damp(s);
     }
   }
@@ -379,7 +379,7 @@ void releaseDampingSimultan(int dampStrings[]){
       Serial.println("in releaseDampingSimultan()");
   }
   for(int s = 0; s < 3; s++){
-    if(dampStrings[0] == 0){
+    if(dampStrings[s] == 0){
       releaseDamping(s);
     }
   }
