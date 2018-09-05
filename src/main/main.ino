@@ -131,6 +131,12 @@ int serialReceivedDuration = 0;
 int serialReceivedDamping = 0;
 int serialReceivedBpm = 100;
 int serialReceivedFrets[3] = {-1, -1, -1};
+int serialReceivedDurations[3] = {1, 1, 1};
+int serialReceivedDampings[3] = {0, 0, 0};
+
+boolean activeStrings[3] = {false, false, false};
+int durations[3] = {0, 0, 0};
+int oldFrets[3] = {0, 0, 0};
 
 void setup() {
   // put your setup code here, to run once:
@@ -159,9 +165,10 @@ void setup() {
 //int msgInd = 0; // only for DEBUGGING
 
 void loop(){
+  // Arduino receives one message per beat
   if (Serial.available() > 0){
     // waiting to receive something.
-    //receivedMsg = Serial.readStringUntil('\n');
+    receivedMsg = Serial.readStringUntil('\n');
     
     /* DEBUG
     if (msgInd % 2 == 0){
@@ -182,7 +189,23 @@ void loop(){
 
     msgIndStart = msgIndEnd + 1;
     msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
+    serialReceivedDurations[0] = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
+
+    msgIndStart = msgIndEnd + 1;
+    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
+    serialReceivedDampings[0] = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
+
+    msgIndStart = msgIndEnd + 1;
+    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
     serialReceivedFrets[1] = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
+
+    msgIndStart = msgIndEnd + 1;
+    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
+    serialReceivedDurations[1] = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
+
+    msgIndStart = msgIndEnd + 1;
+    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
+    serialReceivedDampings[1] = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
 
     msgIndStart = msgIndEnd + 1;
     msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
@@ -190,151 +213,83 @@ void loop(){
 
     msgIndStart = msgIndEnd + 1;
     msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
-    serialReceivedDuration = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
-    
+    serialReceivedDurations[2] = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
+
     msgIndStart = msgIndEnd + 1;
-    serialReceivedDamping = receivedMsg.substring(msgIndStart, msgIndStart + 1).toInt();
+    serialReceivedDampings[2] = receivedMsg.substring(msgIndStart, msgIndStart + 1).toInt();
 
     noteDuration = 60000 / serialReceivedBpm;
-
-    boolean strings[3] = {false, false, false};
-    for(int i = 0; i < 3; i++) {
-      strings[i] = serialReceivedFrets[i] >= 0 ? true : false;
-    }
 
     if (DEBUG) {
       Serial.print("serialReceivedBpm: ");
       Serial.print(serialReceivedBpm);
       Serial.print(" serialReceivedFrets[0]: ");
       Serial.print(serialReceivedFrets[0]);
-      Serial.print(" serialReceivedFrets[1]: ");
+      Serial.print(" serialReceivedDurations[0]: ");
+      Serial.print(serialReceivedDurations[0]);
+      Serial.print(" serialReceivedDampings[0]: ");
+      Serial.println(serialReceivedDampings[0]);
+      Serial.print("serialReceivedFrets[1]: ");
       Serial.print(serialReceivedFrets[1]);
+      Serial.print(" serialReceivedDurations[1]: ");
+      Serial.print(serialReceivedDurations[1]);
+      Serial.print(" serialReceivedDampings[1]: ");
+      Serial.println(serialReceivedDampings[1]);
       Serial.print(" serialReceivedFrets[2]: ");
       Serial.print(serialReceivedFrets[2]);
-      Serial.print(" serialReceivedDuration: ");
-      Serial.print(serialReceivedDuration);
-      Serial.print(" serialReceivedDamping: ");
-      Serial.println(serialReceivedDamping);
+      Serial.print(" serialReceivedDurations[2]: ");
+      Serial.print(serialReceivedDurations[2]);
+      Serial.print(" serialReceivedDampings[2]: ");
+      Serial.println(serialReceivedDampings[2]);
+
+      //calculated values
       Serial.print("strigns[3] = {");
-      Serial.print(strings[0]);
+      Serial.print(activeStrings[0]);
       Serial.print(", ");
-      Serial.print(strings[1]);
+      Serial.print(activeStrings[1]);
       Serial.print(", ");
-      Serial.print(strings[2]);
+      Serial.print(activeStrings[2]);
       Serial.println("}");
     }
-    
-    while(Serial.availableForWrite() <= 0){
-      ; // wait
-    }
-    if(Serial.availableForWrite() > 0){
-      Serial.println(receivedMsg);
-    }
 
+    releaseFretSimultan(oldFrets, durations);
+    //releaseDamping(serialReceivedString);
+
+    for(int i = 0; i < 3; i++) {
+      if (serialReceivedFrets[i] >= 0) {
+        activeStrings[i] = true;
+        durations[i] = serialReceivedDurations[i];
+      } else {
+        activeStrings[i] = false;
+      }
+    }
+    
     t1 = millis();
     fretSimultan(serialReceivedFrets);
     while (millis() - t1 < servoMoveDownTime) {
       ;
     }
     t1 = millis();
-    pluckSimultan(strings);
-    while (millis() - t1 < noteDuration * serialReceivedDuration - servoMoveDownTime - servoDampingTime) {
+    pluckSimultan(activeStrings);
+    /*while (millis() - t1 < noteDuration * serialReceivedDuration - servoMoveDownTime - servoDampingTime) {
       ;
-    }
+    }*/
     t1 = millis();
     //damp(serialReceivedString);
     while (millis() - t1 < servoDampingTime) {
       ;
     }
-    releaseFretSimultan(serialReceivedFrets);
-    //releaseDamping(serialReceivedString);
-  }
-}
-
-
-void loop_old() {
-  // put your main code here, to run repeatedly:
-  // TODO wait for serial cmd to play melody and accompaniment
-  // Serial.println(getStepperLightVal(0));
-  /*int s = 0;  // stirng
-  int f = 0;  // fret
-  for (int s = 1; s < 3; s++) {
-    for (int f = 0; f < melodyFrets; f++) {
-  //for(int n = 0; n < song_notes; n++) {
-  //    s = song[n][0];
-  //    f = song[n][1];
-      t1 = millis();
-      fretMelody(s, f);
-      while (millis() - t1 < servoMoveDownTime) {
-        ;
-      }
-      t1 = millis();
-      pluck_2(s);
-      while (millis() - t1 < noteDuration /** song[n][2]*//* - servoMoveDownTime - servoDampingTime) {
-        ;
-      }
-      t1 = millis();
-      damp(s);
-      while (millis() - t1 < servoDampingTime) {
-        ;
-      }
-      releaseFretMelody(s, f);
-      releaseDamping(s);
-    }
-  }*/
-
-  if (Serial.available() > 0){
-    // waiting to receive something.
-    receivedMsg = Serial.readStringUntil('\n');
-    int msgIndStart = 0;
-    int msgIndEnd = 0;
-    msgIndStart = receivedMsg.indexOf(",") + 1;
-    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
-    serialReceivedBpm = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
-
-    msgIndStart = msgIndEnd + 1;
-    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
-    serialReceivedString = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
-
-    msgIndStart = msgIndEnd + 1;
-    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
-    serialReceivedFret = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
-
-    msgIndStart = msgIndEnd + 1;
-    msgIndEnd = receivedMsg.indexOf(",", msgIndStart);
-    serialReceivedDuration = receivedMsg.substring(msgIndStart, msgIndEnd).toInt();
     
-    msgIndStart = msgIndEnd + 1;
-    serialReceivedDamping = receivedMsg.substring(msgIndStart, msgIndStart + 1).toInt();
 
-    noteDuration = 60000 / serialReceivedBpm;
+    for(int i = 0; i < 3; i++) {
+      durations[i] -= durations[i] > 0 ? 1 : 0;
+    }
     
     while(Serial.availableForWrite() <= 0){
       ; // wait
     }
-    if(Serial.availableForWrite() > 0){
-      Serial.println(receivedMsg);
-    }
-
-    t1 = millis();
-    fretMelody(serialReceivedString, serialReceivedFret);
-    while (millis() - t1 < servoMoveDownTime) {
-      ;
-    }
-    t1 = millis();
-    pluck_2(serialReceivedString);
-    while (millis() - t1 < noteDuration * serialReceivedDuration - servoMoveDownTime - servoDampingTime) {
-      ;
-    }
-    t1 = millis();
-    damp(serialReceivedString);
-    while (millis() - t1 < servoDampingTime) {
-      ;
-    }
-    releaseFretMelody(serialReceivedString, serialReceivedFret);
-    releaseDamping(serialReceivedString);
+    Serial.println(receivedMsg); // indicates, that Arduino is done with the current beat
   }
-  
 }
 
 /**
@@ -391,7 +346,7 @@ void releaseFretMelody(byte s, byte f) {
 /**
  * TODO: write comment
  */
-void releaseFretSimultan(int frets[]) {
+void releaseFretSimultan(int frets[], int durations[]) {
   if (DEBUG) {
       Serial.println("in releaseFretSimultan()");
   }
@@ -402,17 +357,10 @@ void releaseFretSimultan(int frets[]) {
       Serial.print("] = ");
       Serial.println(frets[s]);
     }
-    if (frets[s] > 0) {
+    if (frets[s] > 0 && durations[s] == 0) {
       releaseFretMelody(s, frets[s]);
     }
   }
-}
-
-/**
-   TODO: write comment
-*/
-void fretAccompaniment(byte s, byte f) {
-  // TODO implement this
 }
 
 /**
@@ -431,48 +379,13 @@ void fretSimultan(int frets[]) {
     }
     if (frets[s] > 0) {
       fretMelody(s, frets[s]);
+      oldFrets[s] = frets[s];
     }
   }
 }
 
-
-
 /**
-   Sets new move to position for stepper s, runs to the according position,
-   checks if stepper is at right position and prints warning otherwise.
-   Resets position of stepper s to 0.
-*/
-void pluck(byte s) {
-  steppers[s].moveTo(stepsPerPluck);
-  steppers[s].runToPosition();
-  if (getStepperLightVal(s) < stepperLightThreshold) {
-    setStepperStartPosition(s);
-    if (WARNINGS) {
-      Serial.print("Recalibration might be needed for string: ");
-      Serial.println(s);
-    }
-  }
-  steppers[s].setCurrentPosition(0);
-}
-
-/**
-   Plucks string s by running motor s as long as stepperLightThreshold isn't reached
-   or x ms didn't pass. This is neccessary, because otherwise motor wouldn't run, because
-   it should always stop above stepperLightThreshold. Resets current stepper position to 0.
-*/
-void pluck_2(byte s) {
-  steppers[s].setSpeed(stepperSpeed);
-  long t1 = millis();
-  while (analogRead(lightSensorPins[s]) < stepperLightThreshold || (millis() - t1) < 20) {
-    steppers[s].runSpeed();
-  }
-  steppers[s].stop();
-  steppers[s].setCurrentPosition(0);
-}
-
-
-/**
- * TODO: write comment
+ * checks if all strings should be stopped for plucking
  */
 boolean stopAllStrings(boolean stopStrings[]) {
   if (DEBUG) {
