@@ -62,9 +62,9 @@ const int melodyFretDownVal[melodyStrings][melodyFrets] = {
 };
 
 const int melodyFretUpVal[melodyStrings][melodyFrets] = {
-  {6550, 6200, 6500, 6200, 6200, 6550, 6500, 6550, 6550, 6300},
-  {6550, 6900, 6500, 7000, 6700, 6900, 6500, 7200, 5800, 6600},
-  {6500, 7200, 6100, 7000, 6300, 6900, 6500, 6900, 6800, 6000}
+  {6550, 6200, 6500, 6200, 6200, 6200, 6500, 6050, 6550, 6300},
+  {6550, 6900, 6500, 7000, 6700, 6900, 6500, 7000, 5800, 6600},
+  {6800, 7200, 6100, 6800, 6300, 6600, 6500, 6700, 6700, 6000}
 };
 
 // accompanimentServoMapping contains the servo positions in
@@ -605,7 +605,6 @@ void setupFrettingServos() {
       if (s < 1) { // use maestroSerial_1 for strings 0 and 1
         maestro_1.setSpeed(melodyServoMapping[s][f], melodyServoSpeed);
         maestro_1.setAcceleration(melodyServoMapping[s][f], melodyServoAcceleration);
-        releaseFretMelody(s, f);
       } else if(s == 1 && f < 7) {
         maestro_1.setSpeed(melodyServoMapping[s][f], melodyServoSpeed);
         maestro_1.setAcceleration(melodyServoMapping[s][f], melodyServoAcceleration);
@@ -618,8 +617,10 @@ void setupFrettingServos() {
       } else {
         if (ERRORS) {
           Serial.println("Not implemented yet! In setupFrettingServos()");
+          return;
         }
       }
+      releaseFretMelody(s, f);
       delay(500);
     }
   }
@@ -645,4 +646,3 @@ void setupDampingServos() {
     }
   }
 }
-
